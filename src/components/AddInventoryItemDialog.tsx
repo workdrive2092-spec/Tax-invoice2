@@ -17,7 +17,7 @@ const AddInventoryItemDialog = ({ onAddItem }: AddInventoryItemDialogProps) => {
     name: '',
     hsn: '',
     rate: '',
-    stock: '',
+    stock: '20',
     unit: '',
     gstRate: '',
   });
@@ -72,7 +72,7 @@ const AddInventoryItemDialog = ({ onAddItem }: AddInventoryItemDialogProps) => {
       name: '',
       hsn: '',
       rate: '',
-      stock: '',
+      stock: '20',
       unit: '',
       gstRate: '',
     });

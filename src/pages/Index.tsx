@@ -21,6 +21,8 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/store/authStore';
 import { FileDown, RotateCcw, Receipt, Sparkles } from 'lucide-react';
 
+const INVENTORY_MANAGEMENT_ENABLED = false;
+
 const Index = () => {
   const { user } = useAuthStore();
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
@@ -147,8 +149,10 @@ const Index = () => {
     vehicleNo: '',
   });
 
-  // Load inventory items from Supabase for the logged-in user
+  // Load inventory items from Supabase for the logged-in user (feature-flagged)
   useEffect(() => {
+    if (!INVENTORY_MANAGEMENT_ENABLED) return;
+
     const loadInventoryFromSupabase = async () => {
       if (!user) {
         return;
@@ -225,21 +229,31 @@ const Index = () => {
     const existingItem = invoiceItems.find(i => i.item.id === item.id);
     
     if (existingItem) {
-      if (existingItem.quantity >= item.stock) {
-        toast({
-          title: "Maximum stock reached",
-          description: `Cannot add more ${item.name}. Available: ${item.stock} ${item.unit}`,
-          variant: "destructive",
-        });
-        return;
+      if (INVENTORY_MANAGEMENT_ENABLED) {
+        if (existingItem.quantity >= item.stock) {
+          toast({
+            title: "Maximum stock reached",
+            description: `Cannot add more ${item.name}. Available: ${item.stock} ${item.unit}`,
+            variant: "destructive",
+          });
+          return;
+        }
+        setInvoiceItems(prev =>
+          prev.map(i =>
+            i.item.id === item.id
+              ? { ...i, quantity: Math.min(i.quantity + 1, item.stock) }
+              : i,
+          ),
+        );
+      } else {
+        setInvoiceItems(prev =>
+          prev.map(i =>
+            i.item.id === item.id
+              ? { ...i, quantity: i.quantity + 1 }
+              : i,
+          ),
+        );
       }
-      setInvoiceItems(prev => 
-        prev.map(i => 
-          i.item.id === item.id 
-            ? { ...i, quantity: Math.min(i.quantity + 1, item.stock) }
-            : i
-        )
-      );
     } else {
       setInvoiceItems(prev => [...prev, {
         id: `invoice-${Date.now()}`,
@@ -280,6 +294,20 @@ const Index = () => {
   }, []);
 
   const handleCreateInventoryItem = (item: Omit<InventoryItem, 'id'>) => {
+    if (!INVENTORY_MANAGEMENT_ENABLED) {
+      const newItem: InventoryItem = {
+        id: `local-${Date.now()}`,
+        name: item.name,
+        hsn: item.hsn,
+        rate: item.rate,
+        stock: item.stock,
+        unit: item.unit,
+        gstRate: item.gstRate,
+      };
+      setInventory((prev) => [...prev, newItem]);
+      return;
+    }
+
     if (!user) {
       toast({
         title: 'Not logged in',
@@ -338,6 +366,11 @@ const Index = () => {
   };
 
   const handleRemoveInventoryItem = (id: string) => {
+    if (!INVENTORY_MANAGEMENT_ENABLED) {
+      setInventory((prev) => prev.filter((item) => item.id !== id));
+      return;
+    }
+
     if (!user) {
       toast({
         title: 'Not logged in',
@@ -542,6 +575,16 @@ const Index = () => {
     }
   };
 
+  const handleConfirmItems = async () => {
+    const confirmed = window.confirm('Confirm all items and generate the invoice?');
+    if (!confirmed) return;
+
+    // When inventory management is enabled later, we can adjust stock here
+    // based on the confirmed invoice items before generating the PDF.
+
+    await handleGeneratePdf();
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -611,6 +654,8 @@ const Index = () => {
               onUpdateQuantity={handleUpdateQuantity}
               onUpdateDiscount={handleUpdateDiscount}
               onRemoveItem={handleRemoveItem}
+              inventoryManagementEnabled={INVENTORY_MANAGEMENT_ENABLED}
+              onConfirmItems={handleConfirmItems}
             />
 
             {/* Invoice Options */}

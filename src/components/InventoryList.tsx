@@ -99,7 +99,13 @@ const InventoryList = ({ items, onAddItem, onCreateInventoryItem, onRemoveInvent
                     size="icon"
                     variant="ghost"
                     className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive transition-opacity"
-                    onClick={() => onRemoveInventoryItem(item.id)}
+                    onClick={() => {
+                      const confirmed = window.confirm(
+                        'Are you sure you want to delete this item from your inventory?',
+                      );
+                      if (!confirmed) return;
+                      onRemoveInventoryItem(item.id);
+                    }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

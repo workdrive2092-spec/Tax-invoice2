@@ -94,14 +94,15 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: '#334155',
   },
-  col1: { width: '5%' },
-  col2: { width: '30%' },
-  col3: { width: '10%' },
-  col4: { width: '10%' },
-  col5: { width: '10%' },
-  col6: { width: '10%' },
-  col7: { width: '12%' },
-  col8: { width: '13%' },
+  // Columns adjusted to match Sunshine-style format:
+  // Sl No. | Description of Goods | HSN/SAC | Quantity | Rate | per | Amount
+  col1: { width: '7%' },   // Sl No.
+  col2: { width: '38%' },  // Description
+  col3: { width: '12%' },  // HSN/SAC
+  col4: { width: '13%' },  // Quantity
+  col5: { width: '10%' },  // Rate
+  col6: { width: '10%' },  // per
+  col7: { width: '10%' },  // Amount
   summarySection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -326,30 +327,35 @@ const InvoicePdf = ({ invoiceNumber, invoiceDate, items, company, options }: Inv
         {/* Items Table */}
         <View style={styles.table}>
           <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderCell, styles.col1]}>#</Text>
-            <Text style={[styles.tableHeaderCell, styles.col2]}>Item Description</Text>
-            <Text style={[styles.tableHeaderCell, styles.col3]}>HSN</Text>
-            <Text style={[styles.tableHeaderCell, styles.col4]}>Qty</Text>
+            <Text style={[styles.tableHeaderCell, styles.col1]}>Sl No.</Text>
+            <Text style={[styles.tableHeaderCell, styles.col2]}>Description of Goods</Text>
+            <Text style={[styles.tableHeaderCell, styles.col3]}>HSN/SAC</Text>
+            <Text style={[styles.tableHeaderCell, styles.col4]}>Quantity</Text>
             <Text style={[styles.tableHeaderCell, styles.col5]}>Rate</Text>
-            <Text style={[styles.tableHeaderCell, styles.col6]}>Disc%</Text>
-            <Text style={[styles.tableHeaderCell, styles.col7]}>GST%</Text>
-            <Text style={[styles.tableHeaderCell, styles.col8]}>Amount</Text>
+            <Text style={[styles.tableHeaderCell, styles.col6]}>per</Text>
+            <Text style={[styles.tableHeaderCell, styles.col7]}>Amount</Text>
           </View>
           {items.map((item, index) => {
-            const taxableAmount = item.item.rate * item.quantity * (1 - item.discount / 100);
-            const gstAmount = (taxableAmount * item.item.gstRate) / 100;
-            const total = taxableAmount + gstAmount;
+            const baseAmount = item.item.rate * item.quantity;
+            const taxableAmount = baseAmount * (1 - item.discount / 100);
             
             return (
               <View key={item.id} style={styles.tableRow}>
                 <Text style={[styles.tableCell, styles.col1]}>{index + 1}</Text>
                 <Text style={[styles.tableCell, styles.col2]}>{item.item.name}</Text>
                 <Text style={[styles.tableCell, styles.col3]}>{item.item.hsn}</Text>
-                <Text style={[styles.tableCell, styles.col4]}>{item.quantity} {item.item.unit}</Text>
-                <Text style={[styles.tableCell, styles.col5]}>₹{item.item.rate.toLocaleString()}</Text>
-                <Text style={[styles.tableCell, styles.col6]}>{item.discount}%</Text>
-                <Text style={[styles.tableCell, styles.col7]}>{item.item.gstRate}%</Text>
-                <Text style={[styles.tableCell, styles.col8]}>₹{total.toLocaleString()}</Text>
+                <Text style={[styles.tableCell, styles.col4]}>
+                  {item.quantity.toFixed(3)} {item.item.unit}
+                </Text>
+                <Text style={[styles.tableCell, styles.col5]}>
+                  {item.item.rate.toFixed(2)}
+                </Text>
+                <Text style={[styles.tableCell, styles.col6]}>
+                  {item.item.unit}
+                </Text>
+                <Text style={[styles.tableCell, styles.col7]}>
+                  ₹{taxableAmount.toFixed(2)}
+                </Text>
               </View>
             );
           })}

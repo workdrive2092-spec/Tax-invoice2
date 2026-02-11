@@ -9,9 +9,18 @@ interface InvoiceItemsProps {
   onUpdateQuantity: (id: string, quantity: number) => void;
   onUpdateDiscount: (id: string, discount: number) => void;
   onRemoveItem: (id: string) => void;
+  inventoryManagementEnabled?: boolean;
+  onConfirmItems?: () => void;
 }
 
-const InvoiceItems = ({ items, onUpdateQuantity, onUpdateDiscount, onRemoveItem }: InvoiceItemsProps) => {
+const InvoiceItems = ({
+  items,
+  onUpdateQuantity,
+  onUpdateDiscount,
+  onRemoveItem,
+  inventoryManagementEnabled = false,
+  onConfirmItems,
+}: InvoiceItemsProps) => {
   const calculateItemTotal = (item: InvoiceItem) => {
     const baseAmount = item.item.rate * item.quantity;
     const discountAmount = (baseAmount * item.discount) / 100;
@@ -26,15 +35,26 @@ const InvoiceItems = ({ items, onUpdateQuantity, onUpdateDiscount, onRemoveItem 
   return (
     <Card className="shadow-card animate-fade-in">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-          <FileText className="h-5 w-5 text-primary" />
-          Invoice Items
-          {items.length > 0 && (
-            <span className="text-sm font-normal text-muted-foreground">
-              ({items.length} item{items.length > 1 ? 's' : ''})
-            </span>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+            <FileText className="h-5 w-5 text-primary" />
+            Invoice Items
+            {items.length > 0 && (
+              <span className="text-sm font-normal text-muted-foreground">
+                ({items.length} item{items.length > 1 ? 's' : ''})
+              </span>
+            )}
+          </CardTitle>
+          {items.length > 0 && onConfirmItems && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onConfirmItems}
+            >
+              Confirm Items
+            </Button>
           )}
-        </CardTitle>
+        </div>
       </CardHeader>
       <CardContent>
         {items.length === 0 ? (
@@ -80,30 +100,67 @@ const InvoiceItems = ({ items, onUpdateQuantity, onUpdateDiscount, onRemoveItem 
                             size="icon"
                             variant="outline"
                             className="h-7 w-7"
-                            onClick={() => onUpdateQuantity(invoiceItem.id, Math.max(1, invoiceItem.quantity - 1))}
+                            onClick={() =>
+                              onUpdateQuantity(
+                                invoiceItem.id,
+                                Math.max(1, invoiceItem.quantity - 1),
+                              )
+                            }
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
                           <Input
                             type="number"
                             min={1}
-                            max={invoiceItem.item.stock}
+                            {...(inventoryManagementEnabled
+                              ? { max: invoiceItem.item.stock }
+                              : {})}
                             value={invoiceItem.quantity}
-                            onChange={(e) => onUpdateQuantity(invoiceItem.id, Math.min(invoiceItem.item.stock, parseInt(e.target.value) || 1))}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value, 10);
+                              if (Number.isNaN(value) || value <= 0) {
+                                onUpdateQuantity(invoiceItem.id, 1);
+                                return;
+                              }
+
+                              if (
+                                inventoryManagementEnabled &&
+                                value > invoiceItem.item.stock
+                              ) {
+                                onUpdateQuantity(
+                                  invoiceItem.id,
+                                  invoiceItem.item.stock,
+                                );
+                                return;
+                              }
+
+                              onUpdateQuantity(invoiceItem.id, value);
+                            }}
                             className="w-16 h-7 text-center font-mono"
                           />
                           <Button
                             size="icon"
                             variant="outline"
                             className="h-7 w-7"
-                            onClick={() => onUpdateQuantity(invoiceItem.id, Math.min(invoiceItem.item.stock, invoiceItem.quantity + 1))}
+                            onClick={() => {
+                              const nextQuantity = inventoryManagementEnabled
+                                ? Math.min(
+                                    invoiceItem.item.stock,
+                                    invoiceItem.quantity + 1,
+                                  )
+                                : invoiceItem.quantity + 1;
+                              onUpdateQuantity(invoiceItem.id, nextQuantity);
+                            }}
                           >
                             <Plus className="h-3 w-3" />
                           </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground text-center mt-1">
-                          Max: {invoiceItem.item.stock} {invoiceItem.item.unit}
-                        </p>
+                        {inventoryManagementEnabled && (
+                          <p className="text-xs text-muted-foreground text-center mt-1">
+                            Max: {invoiceItem.item.stock}{' '}
+                            {invoiceItem.item.unit}
+                          </p>
+                        )}
                       </td>
                       <td className="py-3 text-right font-mono">
                         ₹{invoiceItem.item.rate.toLocaleString()}
@@ -132,7 +189,13 @@ const InvoiceItems = ({ items, onUpdateQuantity, onUpdateDiscount, onRemoveItem 
                           size="icon"
                           variant="ghost"
                           className="h-7 w-7 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
-                          onClick={() => onRemoveItem(invoiceItem.id)}
+                          onClick={() => {
+                            const confirmed = window.confirm(
+                              'Are you sure you want to remove this item from the invoice?',
+                            );
+                            if (!confirmed) return;
+                            onRemoveItem(invoiceItem.id);
+                          }}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
