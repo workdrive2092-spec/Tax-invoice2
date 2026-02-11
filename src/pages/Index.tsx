@@ -24,6 +24,7 @@ import { FileDown, RotateCcw, Receipt, Sparkles } from 'lucide-react';
 const Index = () => {
   const { user } = useAuthStore();
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => inventoryItems);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companies, setCompanies] = useState<Company[]>(() => {
     if (typeof window === 'undefined') return defaultCompanies;
@@ -146,6 +147,80 @@ const Index = () => {
     vehicleNo: '',
   });
 
+  // Load inventory items from Supabase for the logged-in user
+  useEffect(() => {
+    const loadInventoryFromSupabase = async () => {
+      if (!user) {
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('inventory_items')
+          .select('*')
+          .order('created_at', { ascending: true });
+
+        if (error) {
+          console.error('Error loading inventory from Supabase:', error);
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          // Seed default inventory items for first-time use
+          const { data: seeded, error: seedError } = await supabase
+            .from('inventory_items')
+            .insert(
+              inventoryItems.map((item) => ({
+                user_id: user.id,
+                name: item.name,
+                hsn: item.hsn,
+                rate: item.rate,
+                stock: item.stock,
+                unit: item.unit,
+                gst_rate: item.gstRate,
+              })),
+            )
+            .select('*');
+
+          if (seedError || !seeded) {
+            console.error('Error seeding default inventory to Supabase:', seedError);
+            return;
+          }
+
+          setInventory(
+            seeded.map((row) => ({
+              id: row.id as string,
+              name: row.name as string,
+              hsn: row.hsn as string,
+              rate: Number(row.rate || 0),
+              stock: Number(row.stock || 0),
+              unit: row.unit as string,
+              gstRate: Number(row.gst_rate || 0),
+            })),
+          );
+
+          return;
+        }
+
+        setInventory(
+          data.map((row) => ({
+            id: row.id as string,
+            name: row.name as string,
+            hsn: row.hsn as string,
+            rate: Number(row.rate || 0),
+            stock: Number(row.stock || 0),
+            unit: row.unit as string,
+            gstRate: Number(row.gst_rate || 0),
+          })),
+        );
+      } catch (err) {
+        console.error('Unexpected error loading inventory from Supabase:', err);
+      }
+    };
+
+    void loadInventoryFromSupabase();
+  }, [user]);
+
   const handleAddItem = useCallback((item: InventoryItem) => {
     const existingItem = invoiceItems.find(i => i.item.id === item.id);
     
@@ -203,6 +278,103 @@ const Index = () => {
       description: "Item removed from invoice",
     });
   }, []);
+
+  const handleCreateInventoryItem = (item: Omit<InventoryItem, 'id'>) => {
+    if (!user) {
+      toast({
+        title: 'Not logged in',
+        description: 'Please log in again to save items.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('inventory_items')
+          .insert({
+            user_id: user.id,
+            name: item.name,
+            hsn: item.hsn,
+            rate: item.rate,
+            stock: item.stock,
+            unit: item.unit,
+            gst_rate: item.gstRate,
+          })
+          .select('*')
+          .single();
+
+        if (error || !data) {
+          console.error('Error saving inventory item to Supabase:', error);
+          toast({
+            title: 'Error saving item',
+            description: error?.message || 'Could not save item to database.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const savedItem: InventoryItem = {
+          id: data.id as string,
+          name: data.name as string,
+          hsn: data.hsn as string,
+          rate: Number(data.rate || 0),
+          stock: Number(data.stock || 0),
+          unit: data.unit as string,
+          gstRate: Number(data.gst_rate || 0),
+        };
+
+        setInventory((prev) => [...prev, savedItem]);
+      } catch (err: any) {
+        console.error('Unexpected error saving inventory item to Supabase:', err);
+        toast({
+          title: 'Error saving item',
+          description: err?.message || 'Unexpected error while saving item.',
+          variant: 'destructive',
+        });
+      }
+    })();
+  };
+
+  const handleRemoveInventoryItem = (id: string) => {
+    if (!user) {
+      toast({
+        title: 'Not logged in',
+        description: 'Please log in again to manage items.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    void (async () => {
+      try {
+        const { error } = await supabase
+          .from('inventory_items')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          console.error('Error deleting inventory item from Supabase:', error);
+          toast({
+            title: 'Error deleting item',
+            description: error.message || 'Could not delete item from database.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        setInventory((prev) => prev.filter((item) => item.id !== id));
+      } catch (err: any) {
+        console.error('Unexpected error deleting inventory item from Supabase:', err);
+        toast({
+          title: 'Error deleting item',
+          description: err?.message || 'Unexpected error while deleting item.',
+          variant: 'destructive',
+        });
+      }
+    })();
+  };
 
   const handleAddCompany = (company: Company) => {
     if (!user) {
@@ -416,7 +588,12 @@ const Index = () => {
         <div className="grid gap-6 lg:grid-cols-[350px_1fr]">
           {/* Left Sidebar - Inventory */}
           <aside className="lg:sticky lg:top-24 lg:h-fit">
-            <InventoryList items={inventoryItems} onAddItem={handleAddItem} />
+            <InventoryList
+              items={inventory}
+              onAddItem={handleAddItem}
+              onCreateInventoryItem={handleCreateInventoryItem}
+              onRemoveInventoryItem={handleRemoveInventoryItem}
+            />
           </aside>
 
           {/* Right Content */}

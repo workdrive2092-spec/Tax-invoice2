@@ -4,14 +4,17 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { InventoryItem } from '@/data/mockData';
-import { Package, Search, Plus, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Package, Search, Plus, AlertTriangle, CheckCircle, Trash2 } from 'lucide-react';
+import AddInventoryItemDialog from '@/components/AddInventoryItemDialog';
 
 interface InventoryListProps {
   items: InventoryItem[];
   onAddItem: (item: InventoryItem) => void;
+  onCreateInventoryItem?: (item: Omit<InventoryItem, 'id'>) => void;
+  onRemoveInventoryItem?: (id: string) => void;
 }
 
-const InventoryList = ({ items, onAddItem }: InventoryListProps) => {
+const InventoryList = ({ items, onAddItem, onCreateInventoryItem, onRemoveInventoryItem }: InventoryListProps) => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredItems = items.filter(item =>
@@ -28,14 +31,19 @@ const InventoryList = ({ items, onAddItem }: InventoryListProps) => {
   return (
     <Card className="h-full shadow-card animate-fade-in">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold">
             <Package className="h-5 w-5 text-primary" />
             Inventory Items
           </CardTitle>
-          <Badge variant="secondary" className="font-mono">
-            {filteredItems.length} items
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="font-mono">
+              {filteredItems.length} items
+            </Badge>
+            {onCreateInventoryItem && (
+              <AddInventoryItemDialog onAddItem={onCreateInventoryItem} />
+            )}
+          </div>
         </div>
         <div className="relative mt-3">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -75,16 +83,28 @@ const InventoryList = ({ items, onAddItem }: InventoryListProps) => {
                   </Badge>
                 </div>
               </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={() => onAddItem(item)}
-                disabled={item.stock === 0}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => onAddItem(item)}
+                  disabled={item.stock === 0}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+                {onRemoveInventoryItem && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive transition-opacity"
+                    onClick={() => onRemoveInventoryItem(item.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           );
         })}
