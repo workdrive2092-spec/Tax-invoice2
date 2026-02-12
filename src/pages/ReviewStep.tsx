@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import InvoicePdf from '@/components/InvoicePdf';
 import { useInvoiceWizardStore } from '@/store/invoiceWizardStore';
 import { generateInvoiceNumber, sellerInfo } from '@/data/mockData';
+import { supabase } from '@/lib/supabase';
 
 const ReviewStep = () => {
   const navigate = useNavigate();
-  const { items, company, options, setOptions } = useInvoiceWizardStore();
+  const { items, company, options, setOptions, setCompany } = useInvoiceWizardStore();
   const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
@@ -33,6 +34,34 @@ const ReviewStep = () => {
 
   const handleGeneratePdf = async () => {
     if (!company || items.length === 0) return;
+
+    const paymentDone = window.confirm(
+      'Is payment received for this invoice?\n\nOK = Yes (payment done)\nCancel = No (add amount to customer balance)',
+    );
+
+    if (!paymentDone) {
+      try {
+        const currentBalance = company.pendingAmount ?? 0;
+        const newBalance = currentBalance + grandTotal;
+
+        const { data, error } = await supabase
+          .from('companies')
+          .update({ pending_amount: newBalance })
+          .eq('id', company.id)
+          .select('*')
+          .single();
+
+        if (!error && data) {
+          const updatedCompany = {
+            ...company,
+            pendingAmount: Number(data.pending_amount || newBalance),
+          };
+          setCompany(updatedCompany);
+        }
+      } catch (e) {
+        console.error('Error updating customer balance:', e);
+      }
+    }
 
     setIsGenerating(true);
     try {

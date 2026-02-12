@@ -53,6 +53,7 @@ const AddCompanyDialog = ({ onAddCompany }: AddCompanyDialogProps) => {
     gstNo: '',
     address: '',
     stateCode: '',
+    openingBalance: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -80,6 +81,7 @@ const AddCompanyDialog = ({ onAddCompany }: AddCompanyDialogProps) => {
     }
 
     const selectedState = indianStates.find(s => s.code === formData.stateCode);
+    const openingBalance = Number(formData.openingBalance || 0);
     
     const newCompany: Company = {
       id: `new-${Date.now()}`,
@@ -88,11 +90,11 @@ const AddCompanyDialog = ({ onAddCompany }: AddCompanyDialogProps) => {
       address: formData.address.trim(),
       state: selectedState?.name || '',
       stateCode: formData.stateCode,
-      pendingAmount: 0,
+      pendingAmount: Number.isNaN(openingBalance) ? 0 : openingBalance,
     };
 
     onAddCompany(newCompany);
-    setFormData({ name: '', gstNo: '', address: '', stateCode: '' });
+    setFormData({ name: '', gstNo: '', address: '', stateCode: '', openingBalance: '' });
     setErrors({});
     setOpen(false);
     
@@ -183,6 +185,23 @@ const AddCompanyDialog = ({ onAddCompany }: AddCompanyDialogProps) => {
               }}
             />
             {errors.address && <p className="text-xs text-destructive">{errors.address}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="openingBalance">Opening Balance (optional)</Label>
+            <Input
+              id="openingBalance"
+              type="number"
+              min={0}
+              placeholder="Enter old balance, e.g. 5000"
+              value={formData.openingBalance}
+              onChange={(e) => {
+                setFormData(prev => ({ ...prev, openingBalance: e.target.value }));
+              }}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              If customer already has outstanding balance, enter it here.
+            </p>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

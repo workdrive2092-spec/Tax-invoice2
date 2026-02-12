@@ -8,6 +8,7 @@ import { Company, companies as defaultCompanies } from '@/data/mockData';
 import { useInvoiceWizardStore } from '@/store/invoiceWizardStore';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
+import AddCompanyDialog from '@/components/AddCompanyDialog';
 
 const CustomerStep = () => {
   const navigate = useNavigate();
@@ -67,6 +68,60 @@ const CustomerStep = () => {
     setCompany(c);
   };
 
+  const handleAddCompanyWizard = (c: Company) => {
+    // Persist to Supabase if user is logged in, otherwise only keep in memory
+    if (!user) {
+      setAllCompanies((prev) => [...prev, c]);
+      setCompany(c);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('companies')
+          .insert({
+            user_id: user.id,
+            gst_no: c.gstNo,
+            name: c.name,
+            address: c.address,
+            state: c.state,
+            state_code: c.stateCode,
+            pending_amount: c.pendingAmount ?? 0,
+            last_transaction: c.lastTransaction
+              ? new Date(c.lastTransaction).toISOString()
+              : null,
+          })
+          .select('*')
+          .single();
+
+        if (error || !data) {
+          // Fallback: keep only in memory
+          setAllCompanies((prev) => [...prev, c]);
+          setCompany(c);
+          return;
+        }
+
+        const saved: Company = {
+          id: data.id as string,
+          gstNo: data.gst_no as string,
+          name: data.name as string,
+          address: (data.address as string) || '',
+          state: (data.state as string) || '',
+          stateCode: (data.state_code as string) || '',
+          pendingAmount: Number(data.pending_amount || 0),
+          lastTransaction: data.last_transaction as string | undefined,
+        };
+
+        setAllCompanies((prev) => [...prev, saved]);
+        setCompany(saved);
+      } catch {
+        setAllCompanies((prev) => [...prev, c]);
+        setCompany(c);
+      }
+    })();
+  };
+
   const goNext = () => {
     if (!company) {
       alert('Select a customer first (use arrow keys + Enter).');
@@ -93,9 +148,12 @@ const CustomerStep = () => {
           <section className="space-y-3">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">
-                  Search Customer
-                </CardTitle>
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-sm font-semibold">
+                    Search Customer
+                  </CardTitle>
+                  <AddCompanyDialog onAddCompany={handleAddCompanyWizard} />
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <Input

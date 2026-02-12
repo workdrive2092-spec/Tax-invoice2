@@ -1,14 +1,15 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import InventoryList from '@/components/InventoryList';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { InvoiceItem, InventoryItem, inventoryItems } from '@/data/mockData';
 import { useInvoiceWizardStore } from '@/store/invoiceWizardStore';
 
 const ItemsStep = () => {
   const navigate = useNavigate();
   const { items, setItems, reset } = useInvoiceWizardStore();
+  const [search, setSearch] = useState('');
 
   // Start fresh when entering the wizard
   useEffect(() => {
@@ -18,7 +19,7 @@ const ItemsStep = () => {
   }, [items.length, reset]);
 
   const handleAddItem = useCallback(
-    (item: InventoryItem) => {
+    (item: InventoryItem, focusQuantity: boolean = false) => {
       const existing = items.find((i) => i.item.id === item.id);
 
       if (existing) {
@@ -27,13 +28,25 @@ const ItemsStep = () => {
         );
         setItems(nextItems);
       } else {
+        const newId = `wizard-${Date.now()}`;
         const newItem: InvoiceItem = {
-          id: `wizard-${Date.now()}`,
+          id: newId,
           item,
           quantity: 1,
           discount: 0,
         };
         setItems([...items, newItem]);
+
+        if (focusQuantity) {
+          // Focus the quantity field for this new row after render
+          setTimeout(() => {
+            const el = document.querySelector<HTMLInputElement>(
+              `[data-qty-for="${newId}"]`,
+            );
+            el?.focus();
+            el?.select();
+          }, 0);
+        }
       }
     },
     [items, setItems],
@@ -64,6 +77,16 @@ const ItemsStep = () => {
     return sum + base;
   }, 0);
 
+  const filteredItems = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return inventoryItems;
+    return inventoryItems.filter(
+      (it) =>
+        it.name.toLowerCase().includes(term) ||
+        it.hsn.toLowerCase().includes(term),
+    );
+  }, [search]);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
@@ -80,7 +103,69 @@ const ItemsStep = () => {
       <main className="container py-4 space-y-4">
         <div className="grid gap-4 lg:grid-cols-[350px_1fr]">
           <aside className="lg:sticky lg:top-20 lg:h-fit">
-            <InventoryList items={inventoryItems} onAddItem={handleAddItem} />
+            <Card className="shadow-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold">
+                  Search & add items
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Input
+                  autoFocus
+                  placeholder="Type item name, press Enter to add first match"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const first = filteredItems[0];
+                      if (first) {
+                        handleAddItem(first, true);
+                      }
+                    }
+                  }}
+                />
+                <div className="max-h-[420px] overflow-y-auto border rounded bg-card">
+                  {filteredItems.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-muted-foreground">
+                      No matching items.
+                    </p>
+                  ) : (
+                    <ul className="text-xs">
+                      {filteredItems.map((item) => (
+                        <li
+                          key={item.id}
+                          tabIndex={0}
+                          className="px-3 py-2 border-b last:border-b-0 cursor-pointer hover:bg-primary/10 focus:outline-none focus:bg-primary/10"
+                          onClick={() => handleAddItem(item, true)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddItem(item, true);
+                            }
+                          }}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-medium truncate">{item.name}</p>
+                              <p className="text-[10px] text-muted-foreground truncate">
+                                HSN: {item.hsn}
+                              </p>
+                            </div>
+                            <div className="text-right text-[11px] text-muted-foreground font-mono">
+                              <div>
+                                {item.rate.toFixed(2)}/{item.unit}
+                              </div>
+                              <div>GST {item.gstRate}%</div>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </aside>
 
           <section className="space-y-3">
@@ -125,6 +210,7 @@ const ItemsStep = () => {
                                   className="w-16 border rounded px-1 py-0.5 text-center text-xs font-mono"
                                   type="number"
                                   min={1}
+                                  data-qty-for={row.id}
                                   value={row.quantity}
                                   onChange={(e) =>
                                     handleUpdateQuantity(
